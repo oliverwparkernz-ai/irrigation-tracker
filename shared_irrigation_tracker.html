@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172b20"><title>Shared Irrigation Tracker</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17231d;background:#f3f5f1}*{box-sizing:border-box}
+body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}header{background:#172b20;color:white;padding:22px 18px 20px;border-radius:0 0 22px 22px}
+h1{font-size:23px;margin:0 0 5px}header p{margin:0;color:#c7d4c9;font-size:13px}main{max-width:680px;margin:auto;padding:16px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px}.stat,.panel,.run{background:white;border:1px solid #e2e8e1;border-radius:16px;padding:14px}
+.stat b{display:block;font-size:25px}.stat span,.muted{font-size:12px;color:#718075}h2{font-size:17px;margin:20px 2px 10px}
+label{display:block;font-size:12px;font-weight:650;color:#526156;margin:11px 0 5px}input{width:100%;padding:12px;border:1px solid #d7dfd6;border-radius:10px;background:white;font-size:16px;color:#17231d}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}button{border:0;border-radius:10px;padding:11px 13px;font-size:14px;font-weight:650;background:#e9eee8;color:#24382a}
+button.primary{background:#245b37;color:white;width:100%;margin-top:14px;padding:14px}button.green{background:#e1f1e4;color:#1b6634}button.orange{background:#fff0d8;color:#8a5100}button.red{background:#fae6e4;color:#9b3028}
+.actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.actions button{flex:1;min-width:90px}.run{margin-bottom:10px}.runhead,.topline{display:flex;justify-content:space-between;gap:8px;align-items:center}.runname{font-weight:750;font-size:15px}
+.pill{font-size:11px;border-radius:99px;padding:5px 8px;background:#e3f2e5;color:#216b37;white-space:nowrap}.pill.stop{background:#fff0d8;color:#895400}.pill.done{background:#e9ece9;color:#5f6b62}
+.big{font-size:23px;font-weight:800;margin:9px 0 2px}.bar{height:8px;border-radius:9px;background:#e8ede7;overflow:hidden;margin:10px 0 5px}.bar i{display:block;height:100%;background:#39834c}
+.empty{text-align:center;padding:25px;color:#718075;background:white;border-radius:15px;border:1px dashed #ccd6cc;font-size:13px}.hidden{display:none!important}
+.smallbtn{font-size:12px;padding:8px 10px}.notice{padding:11px;border-radius:10px;background:#edf3ed;color:#3d5743;font-size:12px;line-height:1.5;margin:10px 0}
+.status{font-size:12px;color:#b8d5bf}.status.off{color:#f2c3a8}details summary{font-weight:700;cursor:pointer;padding:4px 0}details{margin-top:12px}
+footer{text-align:center;color:#849087;font-size:11px;padding:22px 10px}dialog{border:0;border-radius:18px;padding:18px;width:calc(100% - 28px);max-width:480px;box-shadow:0 15px 50px #0003}dialog::backdrop{background:#13201888}dialog h3{margin:0 0 8px}
+</style>
+</head><body>
+<header><div class="topline"><h1>💧 Irrigation Tracker</h1><span id="connection" class="status off">Not connected</span></div><p>Shared live view of irrigation runs, locations and finish times.</p></header>
+<main>
+<div id="setup" class="panel">
+<h2 style="margin-top:0">Connect your team's shared tracker</h2>
+<div class="notice">This version uses Firebase Realtime Database. Create a Firebase project, enable Anonymous Authentication and Realtime Database, then paste the web app settings below. You only need to do this once on the manager's device.</div>
+<label>Firebase API key</label><input id="apiKey" placeholder="AIza...">
+<label>Firebase auth domain</label><input id="authDomain" placeholder="your-project.firebaseapp.com">
+<label>Database URL</label><input id="databaseURL" placeholder="https://your-project-default-rtdb...">
+<label>Project ID</label><input id="projectId" placeholder="your-project-id">
+<label>App ID</label><input id="appId" placeholder="1:...:web:...">
+<button class="primary" id="connectBtn">Connect database</button>
+<p class="muted">Firebase setup guide: <a href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noopener">Web app setup</a> · <a href="https://firebase.google.com/docs/database/web/start" target="_blank" rel="noopener">Realtime Database</a></p>
+</div>
+<div id="app" class="hidden">
+<div class="stats"><div class="stat"><b id="activeCount">0</b><span>Active runs</span></div><div class="stat"><b id="locationCount">0</b><span>Locations in use</span></div></div>
+<div class="panel">
+<div class="topline"><h2 style="margin:0">Team sharing</h2><button class="smallbtn" id="copyLink">Copy team link</button></div>
+<div class="notice" id="shareText">Anyone with this private link can view and edit the team's runs. Keep it within your team.</div>
+<button id="newTeam" class="smallbtn">Create a new team link</button>
+</div>
+<section class="panel" style="margin-top:12px">
+<h2 style="margin:0">Add an irrigation run</h2>
+<label>Location / paddock / run name</label><input id="location" placeholder="e.g. Reids 2 – 1st Run">
+<div class="grid"><div><label>Total run length (metres)</label><input id="length" type="number" min="0" step="any" placeholder="174"></div><div><label>Travel speed (m/hour)</label><input id="speed" type="number" min="0" step="any" placeholder="20"></div></div>
+<label>Start time</label><input id="start" type="datetime-local"><button class="primary" id="add">＋ Add shared run</button>
+</section>
+<div class="topline"><h2>Current runs</h2><button class="smallbtn" id="historyToggle">Show history</button></div><div id="runs"></div>
+<div id="history" class="hidden"><h2>Completed runs</h2><div id="historyRuns"></div></div>
+<details><summary>Database setup & security notes</summary><div class="notice">In Firebase Console, enable Authentication → Sign-in method → Anonymous. Create a Realtime Database. For a small private team using a hard-to-guess invite link, these rules allow signed-in anonymous app sessions to read/write data:<br><br><code>{"rules":{".read":false,".write":false,"teams":{"$team":{".read":"auth != null",".write":"auth != null"}}}}</code><br><br>This is link-based access, not individual identity verification. Anyone who obtains the team link can edit the data. A stronger setup would use server-side invite-token validation.</div></details>
+</div>
+<footer>Shared cloud data · Changes appear on connected devices automatically.</footer>
+</main>
+<dialog id="editDialog"><h3 id="dialogTitle">Update run</h3><div id="dialogBody"></div><div class="actions"><button id="cancelEdit">Cancel</button><button class="green" id="saveEdit">Save changes</button></div></dialog>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getDatabase,ref,onValue,set,update,remove} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+const $=id=>document.getElementById(id);let db=null,team=null,records={},editing=null,unsubscribe=null;
+const localNow=()=>{let d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};$('start').value=localNow();
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const teamFromUrl=()=>new URLSearchParams(location.hash.slice(1)).get('team');
+function setStatus(t,ok){$('connection').textContent=t;$('connection').className='status'+(ok?'':' off')}
+function path(){return ref(db,'teams/'+team+'/runs')}
+function makeTeam(){let a=new Uint8Array(24);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function connect(){
+ const config={apiKey:$('apiKey').value.trim(),authDomain:$('authDomain').value.trim(),databaseURL:$('databaseURL').value.trim(),projectId:$('projectId').value.trim(),appId:$('appId').value.trim()};
+ if(Object.values(config).some(x=>!x)){alert('Please fill in all five Firebase web app settings.');return}
+ try{localStorage.setItem('irrigationFirebaseConfig',JSON.stringify(config));const app=initializeApp(config);const auth=getAuth(app);await signInAnonymously(auth);db=getDatabase(app);team=teamFromUrl()||makeTeam();if(!teamFromUrl())location.hash='team='+team;
+ $('setup').classList.add('hidden');$('app').classList.remove('hidden');setStatus('Connected · live sync',true);
+ onValue(path(),snap=>{records=snap.val()||{};render()},err=>setStatus('Sync error: '+err.message,false));
+ }catch(e){setStatus('Connection failed',false);alert('Could not connect: '+e.message)}
+}
+$('connectBtn').onclick=connect;
+const params=new URLSearchParams(location.search);const sharedCfg=params.get('cfg');const saved=sharedCfg?(()=>{try{return atob(sharedCfg)}catch{return null}})():localStorage.getItem('irrigationFirebaseConfig');if(saved){try{let c=JSON.parse(saved);$('apiKey').value=c.apiKey;$('authDomain').value=c.authDomain;$('databaseURL').value=c.databaseURL;$('projectId').value=c.projectId;$('appId').value=c.appId;if(sharedCfg){localStorage.setItem('irrigationFirebaseConfig',JSON.stringify(c));setTimeout(connect,250)}}catch{}}
+function updateProgress(r){if(r.status==='Running'){let elapsed=Math.max(0,(Date.now()-r.lastTick)/3600000);r.position=Math.min(r.length,r.position+elapsed*r.speed);r.lastTick=Date.now();if(r.position>=r.length){r.position=r.length;r.status='Completed';r.completedAt=Date.now();update(ref(db,'teams/'+team+'/runs/'+r.id),r)}}}
+function eta(r){return r.status==='Completed'?'Finished':r.status==='Stopped'?'Paused':new Date(Date.now()+Math.max(0,r.length-r.position)/r.speed*3600000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+function remaining(r){let m=Math.round(Math.max(0,r.length-r.position)/r.speed*60);return `${Math.floor(m/60)}h ${m%60}m`}
+function card(r,history=false){let pct=Math.round(100*r.position/r.length);return `<article class="run"><div class="runhead"><div class="runname">${esc(r.location)}</div><span class="pill ${r.status==='Stopped'?'stop':r.status==='Completed'?'done':''}">${r.status}</span></div><div class="big">${history?'Completed':r.status==='Stopped'?'Paused':eta(r)}</div><div class="muted">${history?'Finished '+new Date(r.completedAt).toLocaleString():`Estimated finish · ${remaining(r)} remaining`}</div><div class="bar"><i style="width:${pct}%"></i></div><div class="muted">${r.position.toFixed(1)} m of ${r.length} m · ${pct}% · ${r.speed} m/hr</div>${history?'':`<div class="actions">${r.status==='Running'?`<button class="orange" data-action="pause" data-id="${r.id}">Pause</button>`:`<button class="green" data-action="restart" data-id="${r.id}">Restart</button>`}<button data-action="edit" data-id="${r.id}">Update position / speed</button><button class="red" data-action="finish" data-id="${r.id}">Finish</button><button class="red" data-action="delete" data-id="${r.id}">Delete</button></div>`}</article>`}
+function render(){let all=Object.values(records);all.forEach(r=>{if(r.status==='Running'&&Date.now()-r.lastTick>25000)updateProgress(r)});let active=all.filter(r=>r.status!=='Completed');active.sort((a,b)=>a.status!==b.status?(a.status==='Running'?-1:1):(a.length-a.position)/a.speed-(b.length-b.position)/b.speed);$('activeCount').textContent=active.length;$('locationCount').textContent=new Set(active.map(r=>r.location.split(/[–-]/)[0].trim())).size;$('runs').innerHTML=active.length?active.map(r=>card(r)).join(''):'<div class="empty">No active runs. Add the first one above.</div>';let done=all.filter(r=>r.status==='Completed').sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));$('historyRuns').innerHTML=done.length?done.map(r=>card(r,true)).join(''):'<div class="empty">No completed runs yet.</div>'}
+$('add').onclick=async()=>{let location=$('location').value.trim(),length=Number($('length').value),speed=Number($('speed').value),start=new Date($('start').value).getTime();if(!location||!(length>0)||!(speed>0)||!Number.isFinite(start)){alert('Enter a location, positive length and speed, and a valid start time.');return}let position=Math.min(length,Math.max(0,(Date.now()-start)/3600000*speed)),id=crypto.randomUUID(),r={id,location,length,speed,position,status:position>=length?'Completed':'Running',lastTick:Date.now(),createdAt:start};if(r.status==='Completed')r.completedAt=Date.now();await set(ref(db,'teams/'+team+'/runs/'+id),r);$('location').value='';$('length').value='';$('speed').value='';$('start').value=localNow()};
+$('runs').addEventListener('click',async e=>{let b=e.target.closest('button[data-action]');if(!b)return;let {action,id}=b.dataset,r=records[id];if(!r)return;updateProgress(r);let p=ref(db,'teams/'+team+'/runs/'+id);if(action==='pause')await update(p,{...r,status:'Stopped',lastTick:Date.now()});if(action==='restart')await update(p,{status:'Running',lastTick:Date.now()});if(action==='finish')await update(p,{status:'Completed',position:r.length,completedAt:Date.now()});if(action==='delete'){if(confirm('Delete this run for everyone?'))await remove(p)}if(action==='edit')openEdit(r)});
+function openEdit(r){editing=r.id;$('dialogTitle').textContent=r.location;$('dialogBody').innerHTML=`<label>Current position (metres)</label><input id="ep" type="number" min="0" max="${r.length}" step="any" value="${r.position}"><label>Travel speed (metres/hour)</label><input id="es" type="number" min=".1" step="any" value="${r.speed}"><label>Status</label><input id="est" value="${r.status}" disabled>`;$('editDialog').showModal()}
+$('cancelEdit').onclick=()=>$('editDialog').close();$('saveEdit').onclick=async()=>{let r=records[editing],p=Number($('ep').value),s=Number($('es').value);if(!Number.isFinite(p)||p<0||p>r.length||!(s>0)){alert('Check the position and speed.');return}await update(ref(db,'teams/'+team+'/runs/'+editing),{position:p,speed:s,lastTick:Date.now()});$('editDialog').close()};
+$('copyLink').onclick=async()=>{try{const cfg={apiKey:$('apiKey').value.trim(),authDomain:$('authDomain').value.trim(),databaseURL:$('databaseURL').value.trim(),projectId:$('projectId').value.trim(),appId:$('appId').value.trim()};const u=new URL(location.href);u.searchParams.set('cfg',btoa(JSON.stringify(cfg)));await navigator.clipboard.writeText(u.toString());alert('Team link copied. Send it only to your team.')}catch{prompt('Copy this team link:',(()=>{const u=new URL(location.href);const c={apiKey:$('apiKey').value.trim(),authDomain:$('authDomain').value.trim(),databaseURL:$('databaseURL').value.trim(),projectId:$('projectId').value.trim(),appId:$('appId').value.trim()};u.searchParams.set('cfg',btoa(JSON.stringify(c)));return u.toString()})())}};
+$('newTeam').onclick=()=>{if(confirm('Create a new team link? The existing team data will remain in its old link.')){team=makeTeam();location.hash='team='+team;onValue(path(),snap=>{records=snap.val()||{};render()});}};
+$('historyToggle').onclick=()=>{$('history').classList.toggle('hidden');$('historyToggle').textContent=$('history').classList.contains('hidden')?'Show history':'Hide history'};
+setInterval(()=>{if(db&&team)render()},30000);
+</script></body></html>
